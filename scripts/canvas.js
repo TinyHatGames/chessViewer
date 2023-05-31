@@ -62,8 +62,8 @@ var createScene = function () {
 
   BABYLON.SceneLoader.ImportMesh(
     "",
-    Assets.meshes.Yeti.rootUrl,
-    Assets.meshes.Yeti.filename,
+    "../assets/",
+    "pawnwalk.glb",
     scene,
     function (newMeshes) {
       newMeshes[0].scaling = new BABYLON.Vector3(0.1, 0.1, 0.1);
