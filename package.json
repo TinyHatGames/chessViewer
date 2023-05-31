@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "babylonjs": "^6.5.1",
+    "express": "^4.18.2"
+  },
+  "scripts": {
+    "start": "node ./scripts/app.js"
+  },
+  "name": "testproject",
+  "description": "",
+  "version": "1.0.0",
+  "main": "./scripts/app.js",
+  "devDependencies": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
