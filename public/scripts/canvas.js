@@ -62,7 +62,7 @@ var createScene = function () {
 
   BABYLON.SceneLoader.ImportMesh(
     "",
-    "../assets/",
+    "./assets/",
     "pawnwalk.glb",
     scene,
     function (newMeshes) {
