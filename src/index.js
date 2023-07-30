@@ -5,7 +5,7 @@ import testpgn from "./testpgn.pgn";
 import { Pgn } from "./cm-pgn/src/Pgn.js";
 
 console.log(testpgn);
-var pgn = new Pgn(testpgn);
+var pgn = new Pgn("");
 var engine = null;
 var scene = null;
 
