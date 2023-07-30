@@ -188,6 +188,9 @@ export async function setupBoard(pgn) {
 
           // Setting up the new mesh if one was created on this coordinate
           if (newMesh) {
+            // Giving mesh a piece parameter
+            newMesh.piece = fenboard[x][z];
+
             // Adding shadow
             shadowGenerator.addShadowCaster(newMesh);
 

@@ -1,19 +1,70 @@
-// pgn.history.moves[i].flags
-// 'n' - a non-capture
-// 'b' - a pawn push of two squares
-// 'e' - an en passant capture
-// 'c' - a standard capture
-// 'p' - a promotion
-// 'k' - kingside castling
-// 'q' - queenside castling
+import { Pgn } from "./cm-pgn/src/Pgn.js";
 
 var currentMove = -1;
 var requiredMove = -1;
-var refreshRate = 1000;
+var refreshRate = 100;
 var pgn = null;
 var piecesContainer = null;
 var coordinatePositions = null;
 var moveInProgress = false;
+var moveSpeed = 1;
+
+function setPgn(pgnInput) {
+  console.log("Setting PGN");
+  //console.log(pgnInput);
+  pgn = new Pgn(pgnInput);
+  setBoardToMove(-1);
+}
+
+function setBoardToMove(moveNumber) {
+  var piecesContainerMeshes = piecesContainer.meshes.slice();
+  if (moveNumber == -1) {
+    var fenboard = fenToBoard(
+      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    );
+  } else {
+    var fenboard = fenToBoard(pgn.history.moves[moveNumber].fen);
+  }
+
+  for (var x = 0; x < 8; x++) {
+    for (var z = 0; z < 8; z++) {
+      //Move each piece in the pieces container to the right position based on the current move
+      for (var i = 0; i < piecesContainerMeshes.length; i++) {
+        if (piecesContainerMeshes[i].piece == fenboard[x][z]) {
+          piecesContainerMeshes[i].parent.position = positionFromCoordinate(
+            String.fromCharCode(97 + z) + (8 - x)
+          );
+          piecesContainerMeshes[i].piecePosition.coordinate =
+            String.fromCharCode(97 + z) + (8 - x);
+          piecesContainerMeshes[i].piecePosition.x = z;
+          piecesContainerMeshes[i].piecePosition.y = x;
+          piecesContainerMeshes[i].isVisible = true;
+          if (piecesContainerMeshes[i].weapon != null) {
+            piecesContainerMeshes[i].weapon.isVisible = true;
+          }
+
+          // Play the idle animation
+          scene.stopAnimation(piecesContainerMeshes[i].skeleton);
+          var Idle_Range =
+            piecesContainerMeshes[i].skeleton.getAnimationRange("Idle");
+          scene.beginAnimation(
+            piecesContainerMeshes[i].skeleton,
+            Idle_Range.from,
+            Idle_Range.to,
+            true,
+            1.0
+          );
+
+          // Remove the piece from the container and decrement the counter
+          piecesContainerMeshes.splice(i, 1);
+          break;
+        }
+      }
+    }
+  }
+  currentMove = requiredMove;
+  moveInProgress = false;
+}
 
 function whiteFlash(duration) {
   // Create a new GUI rectangle that covers the entire screen
@@ -73,9 +124,9 @@ async function attack(mesh, targetMesh) {
   var frameRate = engine.getFps();
   var Attack_Range = mesh.skeleton.getAnimationRange("Attack");
   var Death_Range = targetMesh.skeleton.getAnimationRange("Death");
-  var animationTime = 1; // time for the animation in seconds
+  var animationTime = moveSpeed; // time for the animation in seconds
   var animationSpeed =
-    (Attack_Range.to - Attack_Range.from) / (frameRate * animationTime);
+    frameRate / (Attack_Range.to - Attack_Range.from) / animationTime;
   var fromPosition = mesh.parent.position; // the initial position
   var toPosition = targetMesh.parent.position; // the target position
   var moveAnim = null;
@@ -138,7 +189,14 @@ async function attack(mesh, targetMesh) {
     animationSpeed
   );
 
+  // Get the duration of the attack animation
+  const attackAnimDuration =
+    (1000 / frameRate) * (Attack_Range.to - Attack_Range.from) * animationTime;
+
+  // Wait for half the duration of the attack animation
+  await new Promise((resolve) => setTimeout(resolve, attackAnimDuration / 2));
   whiteFlash(500);
+
   await attackAnim.waitAsync();
 
   if (mesh.name.charAt(1) == "n" || mesh.name.charAt(1) == "r") {
@@ -157,18 +215,19 @@ async function attack(mesh, targetMesh) {
     updateMove(currentMove + 1);
   }
 
-  for (var i = 0; i < piecesContainer.meshes.length; i++) {
-    if (piecesContainer.meshes[i] == targetMesh) {
-      piecesContainer.meshes.splice(i, 1);
-    }
-  }
+  // for (var i = 0; i < piecesContainer.meshes.length; i++) {
+  //   if (piecesContainer.meshes[i] == targetMesh) {
+  //     piecesContainer.meshes.splice(i, 1);
+  //   }
+  // }
 
-  //Disposing of the mesh, weapon and skeletons
+  //Hidding the mesh and weapon
   if (targetMesh.weapon != null) {
-    targetMesh.weapon.dispose();
+    targetMesh.weapon.isVisible = false;
   }
-  targetMesh.skeleton.dispose();
-  targetMesh.parent.dispose();
+  //targetMesh.skeleton.dispose();
+  targetMesh.isVisible = false;
+  targetMesh.piecePosition.coordinate = null;
 
   if (mesh.name.charAt(1) == "n" || mesh.name.charAt(1) == "r") {
     moveInProgress = false;
@@ -189,8 +248,8 @@ async function moveTo(mesh, startPosition, targetPosition, castling) {
   var Move_Range;
   var loop = true;
   var animationSpeed = 1;
-  var frameRate = engine.getFps(); // frames per second
-  var animationTime = 1; // time for the animation in seconds
+  var frameRate = engine.getFps().toFixed(); // frames per second
+  var animationTime = moveSpeed; // time for the animation in seconds
   var fromPosition = startPosition; // the initial position
   var toPosition = targetPosition; // the target position
 
@@ -211,7 +270,8 @@ async function moveTo(mesh, startPosition, targetPosition, castling) {
   // If it's a oneshot, the animation should take exactly the whole time of the move
   if (loop == false) {
     animationSpeed =
-      (Move_Range.to - Move_Range.from) / (frameRate * animationTime);
+      frameRate / (Move_Range.to - Move_Range.from) / animationTime;
+    console.log("animationSpeed:" + animationSpeed);
   }
   // If it's not, it should be consistent depending on the move distance
   else {
@@ -272,7 +332,6 @@ async function moveTo(mesh, startPosition, targetPosition, castling) {
 
   console.log("Move Anim over");
 
-  moveInProgress = false;
   scene.stopAnimation(mesh);
   scene.stopAnimation(mesh.skeleton);
   mesh.parent.rotation.y = 0;
@@ -287,6 +346,7 @@ async function moveTo(mesh, startPosition, targetPosition, castling) {
   );
   if (!castling) {
     updateMove(currentMove + 1);
+    moveInProgress = false;
   }
 }
 
@@ -311,6 +371,7 @@ export async function movePiece(moveNumber) {
     var fromMesh = null;
     var toMesh = null;
 
+    console.log("Container:" + piecesContainer.meshes);
     for (var i = 0; i < piecesContainer.meshes.length; i++) {
       // console.log(
       //   piecesContainer.meshes[i].piecePosition.coordinate + "," + nextMove.from
@@ -376,7 +437,7 @@ export async function movePiece(moveNumber) {
       }
 
       // Rook move
-      moveTo(rook, rook.parent.position, rookTarget, true);
+      await moveTo(rook, rook.parent.position, rookTarget, true);
 
       // King move
       var targetPosition = positionFromCoordinate(nextMove.to);
@@ -451,11 +512,16 @@ export function checkMoveSync() {
     "Refreshing. Current move: " +
       currentMove +
       ", Required move: " +
-      requiredMove
+      requiredMove +
+      ", Move in progress: " +
+      moveInProgress
   );
   if (currentMove < requiredMove && !moveInProgress) {
     movePiece(currentMove + 1);
     moveInProgress = true;
+  } else if (currentMove > requiredMove && !moveInProgress) {
+    moveInProgress = true;
+    setBoardToMove(requiredMove);
   }
 }
 
@@ -464,15 +530,153 @@ export function initControls(container, coordinates) {
   piecesContainer = container;
   coordinatePositions = coordinates;
   console.log("Coord pos:" + coordinatePositions);
+
+  // Create a new GUI texture that covers the entire screen
+  const advancedTexture =
+    BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+  // Create a new GUI stack panel to hold the buttons
+  const buttonStackPanel = new BABYLON.GUI.StackPanel("buttonStackPanel");
+  buttonStackPanel.width = "100%";
+  buttonStackPanel.height = "50px";
+  buttonStackPanel.horizontalAlignment =
+    BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+  buttonStackPanel.verticalAlignment =
+    BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM;
+  buttonStackPanel.isVertical = false;
+
+  // Create a new GUI text block for the slider label and add it to the slider stack panel
+  const movesLabel = new BABYLON.GUI.TextBlock("movesLabel");
+  movesLabel.width = "100%";
+  movesLabel.height = "50px";
+  movesLabel.color = "white";
+  movesLabel.text = "Moves: 0/" + pgn.history.moves.length;
+
+  // Create a new GUI button for the "[" control and add it to the button stack panel
+  const leftButton = BABYLON.GUI.Button.CreateSimpleButton("leftButton", "<");
+  leftButton.width = "50%";
+  leftButton.height = "50px";
+  leftButton.color = "grey";
+  leftButton.background = "white";
+  leftButton.paddingRight = "10px";
+  leftButton.onPointerDownObservable.add(() => {
+    requiredMove -= requiredMove > -1 ? 1 : 0;
+    movesLabel.text =
+      "Moves: " + (requiredMove + 1) + "/" + pgn.history.moves.length;
+  });
+  buttonStackPanel.addControl(leftButton);
+
+  // Create a new GUI button for the "]" control and add it to the button stack panel
+  const rightButton = BABYLON.GUI.Button.CreateSimpleButton("rightButton", ">");
+  rightButton.width = "50%";
+  rightButton.height = "50px";
+  rightButton.color = "grey";
+  rightButton.background = "white";
+  rightButton.paddingLeft = "10px";
+  rightButton.onPointerDownObservable.add(() => {
+    requiredMove += requiredMove < pgn.history.moves.length - 1 ? 1 : 0;
+    movesLabel.text =
+      "Moves: " + (requiredMove + 1) + "/" + pgn.history.moves.length;
+  });
+  buttonStackPanel.addControl(rightButton);
+
+  // Create a new GUI stack panel to hold the text input and slider
+  const inputStackPanel = new BABYLON.GUI.StackPanel("inputStackPanel");
+  inputStackPanel.width = "100%";
+  inputStackPanel.height = "60px";
+  inputStackPanel.horizontalAlignment =
+    BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+  inputStackPanel.verticalAlignment =
+    BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+  //inputStackPanel.isVertical = true;
+
+  // Create a new GUI text input for the required move and add it to the input stack panel
+  const pgnInput = new BABYLON.GUI.InputText("pgnInput");
+  pgnInput.width = "100%";
+  pgnInput.height = "50px";
+  pgnInput.color = "grey";
+  pgnInput.background = "white";
+  pgnInput.autoStretchWidth = false;
+  pgnInput.placeholderText = "Please paste a PGN here";
+  pgnInput.placeholderColor = "grey";
+  pgnInput.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+  pgnInput.onTextChangedObservable.add((value) => {
+    // Here set PGN to the value of the text input
+  });
+  pgnInput.onTextPasteObservable.add((value) => {
+    setPgn(pgnInput.text);
+  });
+  inputStackPanel.addControl(pgnInput);
+
+  // Create a new GUI stack panel to hold the slider
+  const sliderStackPanel = new BABYLON.GUI.StackPanel("sliderStackPanel");
+  sliderStackPanel.width = "100%";
+  sliderStackPanel.height = "100px";
+  sliderStackPanel.horizontalAlignment =
+    BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+  sliderStackPanel.verticalAlignment =
+    BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+  //sliderStackPanel.isVertical = true;
+  //advancedTexture.addControl(sliderStackPanel);
+
+  // Create a new GUI text block for the slider label and add it to the slider stack panel
+  const sliderLabel = new BABYLON.GUI.TextBlock("sliderLabel");
+  sliderLabel.width = "100%";
+  sliderLabel.height = "50px";
+  sliderLabel.color = "white";
+  sliderLabel.text = "Move Speed (1s)";
+  sliderStackPanel.addControl(sliderLabel);
+
+  // Create a new GUI slider for the move speed and add it to the slider stack panel
+  const moveSpeedSlider = new BABYLON.GUI.Slider("moveSpeedSlider");
+  moveSpeedSlider.width = "100%";
+  moveSpeedSlider.height = "50px";
+  moveSpeedSlider.minimum = 0.5;
+  moveSpeedSlider.maximum = 3;
+  moveSpeedSlider.color = "white";
+  moveSpeedSlider.value = moveSpeed;
+  moveSpeedSlider.onValueChangedObservable.add((value) => {
+    moveSpeed = value;
+    sliderLabel.text = "Move Speed (" + value.toFixed(1) + "s)";
+  });
+  sliderStackPanel.addControl(moveSpeedSlider);
+
+  // Create a new GUI stack panel to hold all the other panels
+  const mainStackPanel = new BABYLON.GUI.StackPanel("mainStackPanel");
+  mainStackPanel.width = "20%";
+  mainStackPanel.height = "300px";
+  mainStackPanel.paddingTop = "10px";
+  mainStackPanel.paddingRight = "10px";
+  mainStackPanel.horizontalAlignment =
+    BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT;
+  mainStackPanel.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+  mainStackPanel.isVertical = true;
+  advancedTexture.addControl(mainStackPanel);
+  mainStackPanel.addControl(inputStackPanel);
+  mainStackPanel.addControl(sliderStackPanel);
+  mainStackPanel.addControl(movesLabel);
+  mainStackPanel.addControl(buttonStackPanel);
+
   scene.onKeyboardObservable.add((kbInfo) => {
     switch (kbInfo.type) {
       case BABYLON.KeyboardEventTypes.KEYUP:
         switch (kbInfo.event.key) {
           case "[":
-            requiredMove -= requiredMove > 0 ? 1 : 0;
+            requiredMove -= requiredMove > -1 ? 1 : 0;
+            movesLabel.text =
+              "Moves:" + requiredMove + "/" + pgn.history.moves.length;
             break;
           case "]":
-            requiredMove += 1;
+            requiredMove += requiredMove < pgn.history.moves.length - 1 ? 1 : 0;
+            movesLabel.text =
+              "Moves:" + requiredMove + "/" + pgn.history.moves.length;
+            break;
+          case "Enter":
+          case "return":
+            if (pgnInput.text != null && pgnInput.text != "") {
+              //setPgn(pgnInput.text);
+            }
+
             break;
         }
         break;

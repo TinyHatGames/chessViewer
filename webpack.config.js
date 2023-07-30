@@ -18,11 +18,6 @@ const config = {
     host: "localhost",
     static: "./public",
   },
-  plugins: [
-    new HtmlWebpackPlugin({
-      template: "index.html",
-    }),
-  ],
   module: {
     rules: [
       {
@@ -47,6 +42,9 @@ const config = {
     ],
   },
   plugins: [
+    new HtmlWebpackPlugin({
+      template: "index.html",
+    }),
     new CopyPlugin({
       patterns: [{ from: "public/assets", to: "assets" }],
     }),

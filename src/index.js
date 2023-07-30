@@ -10,8 +10,8 @@ var scene = null;
 
 Engine.engineInit().then((engineOutput) => {
   GameInit.setupBoard(pgn).then((gameInitOutput) => {
-    GameFunctions.initControls(gameInitOutput[0], gameInitOutput[1]);
     GameFunctions.startRefresh(pgn);
+    GameFunctions.initControls(gameInitOutput[0], gameInitOutput[1]);
     engine = engineOutput[0];
     scene = engineOutput[1];
     window.addEventListener("resize", function () {
