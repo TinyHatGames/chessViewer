@@ -4,6 +4,7 @@ import * as GameFunctions from "./gameFunctions.js";
 import testpgn from "./testpgn.pgn";
 import { Pgn } from "./cm-pgn/src/Pgn.js";
 
+console.log(testpgn);
 var pgn = new Pgn(testpgn);
 var engine = null;
 var scene = null;

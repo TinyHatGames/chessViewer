@@ -3,18 +3,11 @@ import { Pgn } from "./cm-pgn/src/Pgn.js";
 var currentMove = -1;
 var requiredMove = -1;
 var refreshRate = 100;
-var pgn = null;
+var pgn = new Pgn("");
 var piecesContainer = null;
 var coordinatePositions = null;
 var moveInProgress = false;
 var moveSpeed = 1;
-
-function setPgn(pgnInput) {
-  console.log("Setting PGN");
-  //console.log(pgnInput);
-  pgn = new Pgn(pgnInput);
-  setBoardToMove(-1);
-}
 
 function setBoardToMove(moveNumber) {
   var piecesContainerMeshes = piecesContainer.meshes.slice();
@@ -503,6 +496,8 @@ export function updateMove(move) {
 }
 
 export function startRefresh(inputPgn) {
+  console.log("Starting refresh");
+  console.log(inputPgn);
   pgn = inputPgn;
   setInterval(checkMoveSync, refreshRate);
 }
@@ -583,15 +578,15 @@ export function initControls(container, coordinates) {
   // Create a new GUI stack panel to hold the text input and slider
   const inputStackPanel = new BABYLON.GUI.StackPanel("inputStackPanel");
   inputStackPanel.width = "100%";
-  inputStackPanel.height = "60px";
+  inputStackPanel.height = "100px";
   inputStackPanel.horizontalAlignment =
     BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
   inputStackPanel.verticalAlignment =
     BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
-  //inputStackPanel.isVertical = true;
+  inputStackPanel.isVertical = true;
 
   // Create a new GUI text input for the required move and add it to the input stack panel
-  const pgnInput = new BABYLON.GUI.InputText("pgnInput");
+  const pgnInput = new BABYLON.GUI.InputTextArea("pgnInput");
   pgnInput.width = "100%";
   pgnInput.height = "50px";
   pgnInput.color = "grey";
@@ -600,13 +595,24 @@ export function initControls(container, coordinates) {
   pgnInput.placeholderText = "Please paste a PGN here";
   pgnInput.placeholderColor = "grey";
   pgnInput.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
-  pgnInput.onTextChangedObservable.add((value) => {
-    // Here set PGN to the value of the text input
-  });
-  pgnInput.onTextPasteObservable.add((value) => {
-    setPgn(pgnInput.text);
-  });
   inputStackPanel.addControl(pgnInput);
+
+  // Create a new GUI button for the "]" control and add it to the button stack panel
+  const pgnSubmitButton = BABYLON.GUI.Button.CreateSimpleButton(
+    "pgnSubmitButton",
+    "SUBMIT PGN"
+  );
+  pgnSubmitButton.width = "50%";
+  pgnSubmitButton.height = "50px";
+  pgnSubmitButton.color = "grey";
+  pgnSubmitButton.background = "white";
+  pgnSubmitButton.paddingLeft = "10px";
+  pgnSubmitButton.onPointerDownObservable.add(() => {
+    if (pgnInput.text != null && pgnInput.text != "") {
+      setPgn(pgnInput.text);
+    }
+  });
+  inputStackPanel.addControl(pgnSubmitButton);
 
   // Create a new GUI stack panel to hold the slider
   const sliderStackPanel = new BABYLON.GUI.StackPanel("sliderStackPanel");
@@ -682,4 +688,21 @@ export function initControls(container, coordinates) {
         break;
     }
   });
+}
+
+function setPgn(inputPgn) {
+  console.log("Setting PGN");
+  console.log(inputPgn);
+  try {
+    // Reset the state of the application before parsing
+    currentMove = -1;
+    requiredMove = -1;
+    moveInProgress = false;
+    // Parse the PGN input string
+    pgn = new Pgn(inputPgn.normalize());
+    console.log(pgn);
+  } catch (error) {
+    console.error("Error parsing PGN:", error);
+  }
+  setBoardToMove(-1);
 }

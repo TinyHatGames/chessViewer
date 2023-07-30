@@ -1,9 +1,5 @@
-import testpgn from "./testpgn.pgn";
-import { Pgn } from "./cm-pgn/src/Pgn.js";
 import { importAssetsinManager } from "./assetImport.js";
 import * as GameFunctions from "./gameFunctions.js";
-
-var testPgn = new Pgn(testpgn);
 
 class piecePosition {
   constructor(coordinate, x, y) {
