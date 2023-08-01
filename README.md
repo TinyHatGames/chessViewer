@@ -1,15 +1,7 @@
-# 🚀 Welcome to your new awesome project!
+# Chess Viewer ♟️
 
-This project has been created using **webpack-cli**, you can now run
+Simple chess viewer made with BabylonJS.
 
-```
-npm run build
-```
+Input pgn, profit.
 
-or
-
-```
-yarn build
-```
-
-to bundle your application
+![Danny](https://media.tenor.com/FL4lkl0Jj8EAAAAd/chesscom-chess.gif)
