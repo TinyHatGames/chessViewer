@@ -8,6 +8,96 @@ var piecesContainer = null;
 var coordinatePositions = null;
 var moveInProgress = false;
 var moveSpeed = 1;
+var movesLabel = null;
+
+function createFireball(startPosition, endPosition, duration) {
+  // Create a fireball mesh to represent the fireball
+  var fireball = BABYLON.MeshBuilder.CreateSphere(
+    "fireball",
+    { diameter: 0.5 },
+    scene
+  );
+
+  // Set the starting position of the fireball
+  fireball.position = startPosition;
+  fireball.isVisible = false;
+
+  // Create a particle system for the fireball
+  var particleSystem = new BABYLON.ParticleSystem("fireball", 2000, scene);
+
+  // Set the emitter to the fireball mesh
+  particleSystem.emitter = fireball;
+
+  // Set the particle texture and color
+  particleSystem.particleTexture = new BABYLON.Texture(
+    "assets/fireparticle.png",
+    scene
+  );
+  // Set the particle system to use the alpha channel of the particle texture for transparency
+  particleSystem.useAlphaFromTexture = true;
+
+  particleSystem.color1 = new BABYLON.Color4(1, 0.5, 0, 1);
+  particleSystem.color2 = new BABYLON.Color4(1, 0, 0, 1);
+  particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0);
+
+  // Set the particle size and shape
+  particleSystem.minSize = 0.25;
+  particleSystem.maxSize = 1.5;
+  particleSystem.minLifeTime = 0.1;
+  particleSystem.maxLifeTime = 0.5;
+  particleSystem.emitRate = 300;
+  particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
+  particleSystem.gravity = new BABYLON.Vector3(0, -9.81, 0);
+
+  // Set the particle direction and speed
+  particleSystem.direction1 = new BABYLON.Vector3(0, 0.1, 0);
+  //particleSystem.direction2 = new BABYLON.Vector3(0, 1, 0);
+  particleSystem.minEmitPower = 1;
+  particleSystem.maxEmitPower = 10;
+
+  // Set the minimum and maximum emit boxes to adjust the starting position of the particles
+  particleSystem.minEmitBox = new BABYLON.Vector3(-0.1, 0, -0.1);
+  particleSystem.maxEmitBox = new BABYLON.Vector3(0.1, 0, 0.1);
+
+  // Define the update function to control the size of the particles over time
+  particleSystem.updateFunction = function (particles) {
+    for (var i = 0; i < particles.length; i++) {
+      var particle = particles[i];
+      particle.size *= 0.85;
+    }
+  };
+
+  // Start the particle system
+  particleSystem.start();
+
+  // Animate the fireball mesh from the starting position to the ending position over the specified duration
+  var animation = new BABYLON.Animation(
+    "fireballAnimation",
+    "position",
+    60,
+    BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+    BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+  );
+  var keys = [
+    { frame: 0, value: startPosition },
+    { frame: duration * 60, value: endPosition },
+  ];
+  animation.setKeys(keys);
+  fireball.animations.push(animation);
+  scene.beginAnimation(fireball, 0, duration * 60, false, 1);
+
+  // Continuously update the particle system to emit particles from the fireball mesh
+  scene.registerAfterRender(function () {
+    particleSystem.emitter = fireball;
+  });
+
+  // Remove the fireball mesh and particle system after the animation is complete
+  setTimeout(function () {
+    fireball.dispose();
+    particleSystem.stop();
+    particleSystem.dispose();
+  }, duration * 1000);
+}
 
 function setBoardToMove(moveNumber) {
   var piecesContainerMeshes = piecesContainer.meshes.slice();
@@ -182,6 +272,15 @@ async function attack(mesh, targetMesh) {
     animationSpeed
   );
 
+  if (mesh.name.charAt(1) == "b" || mesh.name.charAt(1) == "q") {
+    var yOffset = new BABYLON.Vector3(0, 1.5, 0);
+    createFireball(
+      fromPosition.clone().addInPlace(yOffset),
+      toPosition.clone().addInPlace(yOffset),
+      animationTime / 1.5
+    );
+  }
+
   // Get the duration of the attack animation
   const attackAnimDuration =
     (1000 / frameRate) * (Attack_Range.to - Attack_Range.from) * animationTime;
@@ -241,7 +340,7 @@ async function moveTo(mesh, startPosition, targetPosition, castling) {
   var Move_Range;
   var loop = true;
   var animationSpeed = 1;
-  var frameRate = engine.getFps().toFixed(); // frames per second
+  var frameRate = engine.getFps(); // frames per second
   var animationTime = moveSpeed; // time for the animation in seconds
   var fromPosition = startPosition; // the initial position
   var toPosition = targetPosition; // the target position
@@ -493,6 +592,14 @@ export function fenToBoard(fen) {
 
 export function updateMove(move) {
   currentMove = move;
+  movesLabel.text =
+    "Halfmove: " +
+    (requiredMove + 1) +
+    "/" +
+    pgn.history.moves.length +
+    " (" +
+    (currentMove + 1) +
+    ")";
 }
 
 export function startRefresh(inputPgn) {
@@ -541,11 +648,11 @@ export function initControls(container, coordinates) {
   buttonStackPanel.isVertical = false;
 
   // Create a new GUI text block for the slider label and add it to the slider stack panel
-  const movesLabel = new BABYLON.GUI.TextBlock("movesLabel");
+  movesLabel = new BABYLON.GUI.TextBlock("movesLabel");
   movesLabel.width = "100%";
   movesLabel.height = "50px";
   movesLabel.color = "white";
-  movesLabel.text = "Moves: 0/" + pgn.history.moves.length;
+  movesLabel.text = "Halfmove: 0/" + pgn.history.moves.length + " (0)";
 
   // Create a new GUI button for the "[" control and add it to the button stack panel
   const leftButton = BABYLON.GUI.Button.CreateSimpleButton("leftButton", "<");
@@ -557,7 +664,13 @@ export function initControls(container, coordinates) {
   leftButton.onPointerDownObservable.add(() => {
     requiredMove -= requiredMove > -1 ? 1 : 0;
     movesLabel.text =
-      "Moves: " + (requiredMove + 1) + "/" + pgn.history.moves.length;
+      "Halfmove: " +
+      (requiredMove + 1) +
+      "/" +
+      pgn.history.moves.length +
+      " (" +
+      (currentMove + 1) +
+      ")";
   });
   buttonStackPanel.addControl(leftButton);
 
@@ -571,7 +684,13 @@ export function initControls(container, coordinates) {
   rightButton.onPointerDownObservable.add(() => {
     requiredMove += requiredMove < pgn.history.moves.length - 1 ? 1 : 0;
     movesLabel.text =
-      "Moves: " + (requiredMove + 1) + "/" + pgn.history.moves.length;
+      "Halfmove: " +
+      (requiredMove + 1) +
+      "/" +
+      pgn.history.moves.length +
+      " (" +
+      (currentMove + 1) +
+      ")";
   });
   buttonStackPanel.addControl(rightButton);
 
@@ -637,8 +756,8 @@ export function initControls(container, coordinates) {
   const moveSpeedSlider = new BABYLON.GUI.Slider("moveSpeedSlider");
   moveSpeedSlider.width = "100%";
   moveSpeedSlider.height = "50px";
-  moveSpeedSlider.minimum = 0.5;
-  moveSpeedSlider.maximum = 3;
+  moveSpeedSlider.minimum = 0.1;
+  moveSpeedSlider.maximum = 2;
   moveSpeedSlider.color = "white";
   moveSpeedSlider.value = moveSpeed;
   moveSpeedSlider.onValueChangedObservable.add((value) => {
@@ -680,10 +799,13 @@ export function initControls(container, coordinates) {
           case "Enter":
           case "return":
             if (pgnInput.text != null && pgnInput.text != "") {
-              //setPgn(pgnInput.text);
+              setPgn(pgnInput.text);
             }
-
             break;
+          case "p":
+            var startPosition = new BABYLON.Vector3.Zero();
+            var endPosition = new BABYLON.Vector3(4, 4, 4);
+            createFireball(startPosition, endPosition, 0.5);
         }
         break;
     }
